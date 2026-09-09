@@ -1,9 +1,11 @@
 package UniMarketCunoc.gt.product.service;
 
 import UniMarketCunoc.gt.product.dto.CategoryResponse;
+import UniMarketCunoc.gt.product.dto.ProductCreateRequest;
 import UniMarketCunoc.gt.product.dto.ProductRequest;
 import UniMarketCunoc.gt.product.dto.ProductResponse;
 import UniMarketCunoc.gt.product.entidad.CategoryEnty;
+import UniMarketCunoc.gt.product.entidad.CategoryNotFoundException;
 import UniMarketCunoc.gt.product.entidad.Product;
 import UniMarketCunoc.gt.product.entidad.ProductNotFoundException;
 import UniMarketCunoc.gt.product.repository.CategoriaRepository;
@@ -33,6 +35,13 @@ public class ProductServiceImpl implements ProductService {
 	public ProductResponse create(ProductRequest request) {
 		Product product = new Product();
 		apply(product, request);
+		return toResponse(productRepository.save(product));
+	}
+
+	@Override
+	public ProductResponse create(ProductCreateRequest request, String imageUrl) {
+		Product product = new Product();
+		apply(product, request, imageUrl);
 		return toResponse(productRepository.save(product));
 	}
 
@@ -76,6 +85,17 @@ public class ProductServiceImpl implements ProductService {
 		product.setCategory(request.category().trim());
 	}
 
+	private void apply(Product product, ProductCreateRequest request, String imageUrl) {
+		CategoryEnty category = categoriaRepository.findById(request.categoryId())
+				.orElseThrow(() -> new CategoryNotFoundException(request.categoryId()));
+		product.setName(request.name().trim());
+		product.setDescription(request.description().trim());
+		product.setPrice(request.price());
+		product.setStock(request.stock());
+		product.setCategory(category.getName());
+		product.setImageUrl(imageUrl);
+	}
+
 	private ProductResponse toResponse(Product product) {
 		return new ProductResponse(
 				product.getId(),
@@ -83,7 +103,8 @@ public class ProductServiceImpl implements ProductService {
 				product.getDescription(),
 				product.getPrice(),
 				product.getStock(),
-				product.getCategory()
+				product.getCategory(),
+				product.getImageUrl()
 		);
 	}
 }
