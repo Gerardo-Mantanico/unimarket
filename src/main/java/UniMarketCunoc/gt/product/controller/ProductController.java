@@ -6,6 +6,10 @@ import UniMarketCunoc.gt.product.dto.ProductCreateRequest;
 import UniMarketCunoc.gt.product.entidad.CategoryEnty;
 import UniMarketCunoc.gt.product.service.ProductImageStorageService;
 import UniMarketCunoc.gt.product.service.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -36,6 +40,14 @@ public class ProductController {
 
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	@ResponseStatus(HttpStatus.CREATED)
+	@Operation(
+			summary = "Crear producto con imagen opcional",
+			requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+					required = true,
+					content = @Content(
+							mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+							schema = @Schema(implementation = CreateProductMultipartRequest.class),
+							encoding = @Encoding(name = "product", contentType = MediaType.APPLICATION_JSON_VALUE))))
 	public ProductResponse create(
 			@Valid @RequestPart("product") ProductCreateRequest request,
 			@RequestPart(value = "image", required = false) MultipartFile image) {
@@ -67,5 +79,11 @@ public class ProductController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long id) {
 		productService.delete(id);
+	}
+
+	private record CreateProductMultipartRequest(
+			ProductCreateRequest product,
+			@Schema(type = "string", format = "binary") String image
+	) {
 	}
 }

@@ -12,6 +12,7 @@ import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -35,7 +36,7 @@ public class StorageConfig {
 
     @Bean
     @ConditionalOnProperty(name = "storage.provider", havingValue = "azure", matchIfMissing = true)
-    public AzureBlobStorageService azureBlobStorageService(
+    public AzureBlobStorageService azureBlobStorageServiceProvider(
             BlobServiceClient blobServiceClient,
             @Value("${storage.azure.container-name}") String containerName,
             @Value("${storage.azure.public-base-url}") String publicBaseUrl) {
@@ -43,19 +44,7 @@ public class StorageConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "azure", matchIfMissing = true)
-    public ProductImageStorageService azureProductImageStorageService(AzureBlobStorageService azureBlobStorageService) {
-        return azureBlobStorageService;
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "azure", matchIfMissing = true)
-    public DocumentStorageService azureDocumentStorageService(AzureBlobStorageService azureBlobStorageService) {
-        return azureBlobStorageService;
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "aws")
+    @ConditionalOnProperty(name = "storage.provider", havingValue = "s3")
     public S3Client awsS3Client(
             @Value("${storage.s3.region}") String region,
             @Value("${storage.s3.access-key}") String accessKey,
@@ -67,24 +56,12 @@ public class StorageConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "aws")
-    public AwsS3StorageService awsStorageService(
+    @ConditionalOnProperty(name = "storage.provider", havingValue = "s3")
+    public AwsS3StorageService awsStorageServiceProvider(
             S3Client s3Client,
             @Value("${storage.s3.bucket}") String bucket,
             @Value("${storage.s3.public-base-url}") String publicBaseUrl) {
         return new AwsS3StorageService(s3Client, bucket, publicBaseUrl);
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "aws")
-    public ProductImageStorageService awsProductImageStorageService(AwsS3StorageService awsStorageService) {
-        return awsStorageService;
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "aws")
-    public DocumentStorageService awsDocumentStorageService(AwsS3StorageService awsStorageService) {
-        return awsStorageService;
     }
 
     @Bean
@@ -102,7 +79,7 @@ public class StorageConfig {
 
     @Bean
     @ConditionalOnProperty(name = "storage.provider", havingValue = "gcp")
-    public GcpStorageService gcpStorageService(
+    public GcpStorageService gcpStorageServiceProvider(
             Storage storage,
             @Value("${storage.gcp.bucket}") String bucket,
             @Value("${storage.gcp.public-base-url}") String publicBaseUrl) {
@@ -110,14 +87,34 @@ public class StorageConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "gcp")
-    public ProductImageStorageService gcpProductImageStorageService(GcpStorageService gcpStorageService) {
-        return gcpStorageService;
+    public ProductImageStorageService productImageStorageService(
+            List<ProductImageStorageService> delegates) {
+        return file -> {
+            RuntimeException lastError = null;
+            for (ProductImageStorageService delegate : delegates) {
+                try {
+                    return delegate.uploadProductImage(file);
+                } catch (RuntimeException ex) {
+                    lastError = ex;
+                }
+            }
+            throw new IllegalStateException("No se pudo subir la imagen en ningún proveedor configurado", lastError);
+        };
     }
 
     @Bean
-    @ConditionalOnProperty(name = "storage.provider", havingValue = "gcp")
-    public DocumentStorageService gcpDocumentStorageService(GcpStorageService gcpStorageService) {
-        return gcpStorageService;
+    public DocumentStorageService documentStorageService(
+            List<DocumentStorageService> delegates) {
+        return (file, folder) -> {
+            RuntimeException lastError = null;
+            for (DocumentStorageService delegate : delegates) {
+                try {
+                    return delegate.uploadDocument(file, folder);
+                } catch (RuntimeException ex) {
+                    lastError = ex;
+                }
+            }
+            throw new IllegalStateException("No se pudo subir el documento en ningún proveedor configurado", lastError);
+        };
     }
 }

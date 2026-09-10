@@ -44,7 +44,8 @@ public class AzureBlobStorageService implements ProductImageStorageService, Docu
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient(containerName);
         containerClient.createIfNotExists();
 
-        String fileName = UUID.randomUUID() + "-" + sanitize(file.getOriginalFilename());
+        String extension = extensionFor(file.getOriginalFilename());
+        String fileName = UUID.randomUUID() + extension;
         String key = folder.trim() + "/" + fileName;
         BlobClient blobClient = containerClient.getBlobClient(key);
         BlobHttpHeaders headers = new BlobHttpHeaders().setContentType(detectContentType(file));
@@ -69,6 +70,15 @@ public class AzureBlobStorageService implements ProductImageStorageService, Docu
         }
         String sanitized = originalFilename.replaceAll("[^a-zA-Z0-9._-]", "_");
         return sanitized.length() > 150 ? sanitized.substring(0, 150) : sanitized;
+    }
+
+    private String extensionFor(String originalFilename) {
+        String sanitized = sanitize(originalFilename);
+        int extensionStart = sanitized.lastIndexOf('.');
+        if (extensionStart <= 0 || extensionStart == sanitized.length() - 1) {
+            return "";
+        }
+        return sanitized.substring(extensionStart);
     }
 
     private String detectContentType(MultipartFile file) {
